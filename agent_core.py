@@ -3,7 +3,6 @@
 import os
 import queue
 import sys
-import tempfile
 import threading
 import time
 
@@ -29,21 +28,48 @@ from tools import ALL_TOOLS
 
 
 # ═══════════════════════════════════════════════════════════════════════
-#  Audio Recording
+#  Noise calibration
+# ═══════════════════════════════════════════════════════════════════════
+
+def calibrate_noise(duration: float = 1.5) -> float:
+    """Sample ambient noise and return a silence threshold.
+
+    The threshold is 3x the ambient RMS, with a floor of 0.02,
+    so it adapts to noisy or quiet environments automatically.
+    """
+    print(f"\U0001F39A\uFE0F  Calibrating... stay quiet for {duration:.1f}s")
+    samples = sd.rec(
+        int(duration * SAMPLE_RATE),
+        samplerate=SAMPLE_RATE,
+        channels=CHANNELS,
+        dtype="float32",
+    )
+    sd.wait()
+    ambient = float(np.sqrt(np.mean(samples ** 2)))
+    threshold = max(ambient * 3.0, 0.02)
+    print(f"   Ambient RMS: {ambient:.4f}  ->  threshold: {threshold:.4f}")
+    return threshold
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Audio recording
 # ═══════════════════════════════════════════════════════════════════════
 
 def record_until_silence(
     sample_rate: int = SAMPLE_RATE,
-    silence_threshold: float = SILENCE_THRESHOLD,
+    silence_threshold: float | None = None,
     silence_duration: float = SILENCE_DURATION_SEC,
     max_duration: float = MAX_RECORD_SEC,
     min_duration: float = MIN_RECORD_SEC,
 ) -> np.ndarray:
-    """Record from the default mic until the user stops speaking.
+    """Record from the mic until the user stops speaking.
 
-    Uses a simple RMS-energy-based silence detector. Returns float32
-    audio samples at `sample_rate`.
+    If silence_threshold is None, auto-calibrates from ambient noise.
+    Returns float32 audio samples.
     """
+    if silence_threshold is None:
+        silence_threshold = calibrate_noise()
+
     q: "queue.Queue[np.ndarray]" = queue.Queue()
     blocks: list[np.ndarray] = []
     silence_start: float | None = None
@@ -99,22 +125,17 @@ def record_until_silence(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-#  Speech-to-Text
+#  Speech-to-text
 # ═══════════════════════════════════════════════════════════════════════
 
 def transcribe_audio(audio: np.ndarray, sample_rate: int = SAMPLE_RATE) -> str:
-    """Transcribe float32 audio using mlx-whisper.
-
-    mlx_whisper.transcribe() accepts a numpy array directly.
-    """
+    """Transcribe float32 audio using mlx-whisper."""
     import mlx_whisper
 
     if len(audio) == 0:
         return ""
 
-    # mlx_whisper expects the array to be float32 in [-1, 1] @ 16 kHz.
     if sample_rate != 16000:
-        # Very simple resample — for best quality record at 16 kHz.
         ratio = 16000 / sample_rate
         new_len = int(len(audio) * ratio)
         audio = np.interp(
@@ -133,10 +154,10 @@ def transcribe_audio(audio: np.ndarray, sample_rate: int = SAMPLE_RATE) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-#  Text-to-Speech
+#  Text-to-speech
 # ═══════════════════════════════════════════════════════════════════════
 
-_tts_model = None  # cached across calls
+_tts_model = None
 
 
 def _get_tts_model():
@@ -155,7 +176,6 @@ def _synthesise(text: str) -> tuple[np.ndarray, int]:
     chunks: list[np.ndarray] = []
     sr: int | None = None
 
-    # Kokoro-style generate: model.generate(text, voice=..., lang_code=...)
     try:
         for result in model.generate(
             text,
@@ -170,9 +190,10 @@ def _synthesise(text: str) -> tuple[np.ndarray, int]:
             if sr is None:
                 sr = int(getattr(result, "sample_rate", 0)) or None
     except TypeError:
-        # Fall back to simpler API
         for result in model.generate(text, voice=TTS_VOICE):
-            audio = getattr(result, "audio", None) or result
+            audio = getattr(result, "audio", None)
+            if audio is None:
+                audio = result
             arr = np.asarray(audio).astype(np.float32).flatten()
             chunks.append(arr)
             if sr is None:
@@ -229,7 +250,7 @@ def build_agent():
     from agent_weave.memory import ConversationMemory
 
     backend = OpenAIBackend(
-        api_key="local",                    # mlx_lm.server ignores this
+        api_key="local",
         base_url=MLX_SERVER_BASE_URL,
         default_model=MLX_SERVER_MODEL,
     )
