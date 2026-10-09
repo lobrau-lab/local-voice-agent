@@ -1,0 +1,11 @@
+mlx-lm
+mlx-whisper
+mlx-audio
+agent-weave-lib[openai]
+openai
+sounddevice
+numpy
+rich
+requests
+beautifulsoup4
+duckduckgo-search
