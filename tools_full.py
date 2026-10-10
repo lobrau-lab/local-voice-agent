@@ -21,6 +21,8 @@ from agent_weave import tool
 
 from config import MEMORY_DIR
 
+MEMORY_PATH = Path(MEMORY_DIR)
+
 ALLOWED_ROOTS = [
     Path.home() / "Documents",
     Path.home() / "Downloads",
@@ -239,12 +241,18 @@ def execute_python(code: str) -> str:
 @tool(description="Search the web via DuckDuckGo and return top results.")
 def web_search(query: str, max_results: int = 5) -> str:
     try:
-        from duckduckgo_search import DDGS
+        try:
+            from ddgs import DDGS
+        except ImportError:
+            from duckduckgo_search import DDGS
         results = []
         with DDGS() as ddgs:
             for r in ddgs.text(query, max_results=max_results):
-                results.append(f"**{r['title']}**\n{r['href']}\n{r['body']}\n")
-        return "\n---\n".join(results) if results else "[no results]"
+                title = r.get("title", "")
+                href = r.get("href") or r.get("url", "")
+                body = r.get("body") or r.get("description", "")
+                results.append(f"**{title}**\n{href}\n{body}\n")
+        return "\n---\n".join(results) if results else "[no results found]"
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"
 
@@ -344,29 +352,54 @@ def mcp_call_tool(server_url: str, tool_name: str, arguments_json: str = "{}") -
 
 @tool(description="Save a note to persistent memory. Use for facts, preferences, and context across sessions.")
 def save_memory(note: str, category: str = "general") -> str:
-    memory_file = MEMORY_DIR / "MEMORY.md"
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-    with open(memory_file, "a", encoding="utf-8") as f:
-        f.write(f"\n- [{ts}] ({category}) {note}\n")
-    return f"[OK] Saved to memory ({category}): {note}"
+    try:
+        memory_file = MEMORY_PATH / "MEMORY.md"
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+        with open(memory_file, "a", encoding="utf-8") as f:
+            f.write(f"\n- [{ts}] ({category}) {note}\n")
+        return f"[OK] Saved to memory ({category}): {note}"
+    except Exception as e:
+        return f"[ERROR] {type(e).__name__}: {e}"
 
 
 @tool(description="Read all saved memory notes.")
 def read_memory() -> str:
-    memory_file = MEMORY_DIR / "MEMORY.md"
-    if not memory_file.exists():
-        return "[no memories saved yet]"
-    return memory_file.read_text(encoding="utf-8")[:8000]
+    try:
+        memory_file = MEMORY_PATH / "MEMORY.md"
+        if not memory_file.exists():
+            return "[no memories saved yet]"
+        return memory_file.read_text(encoding="utf-8")[:8000]
+    except Exception as e:
+        return f"[ERROR] {type(e).__name__}: {e}"
 
 
 @tool(description="Search saved memory notes for a keyword or phrase.")
 def search_memory(query: str) -> str:
-    memory_file = MEMORY_DIR / "MEMORY.md"
-    if not memory_file.exists():
-        return "[no memories saved yet]"
-    lines = memory_file.read_text(encoding="utf-8").splitlines()
-    matches = [l for l in lines if query.lower() in l.lower()]
-    return "\n".join(matches) if matches else f"[no memories matching '{query}']"
+    try:
+        memory_file = MEMORY_PATH / "MEMORY.md"
+        if not memory_file.exists():
+            return "[no memories saved yet]"
+        lines = memory_file.read_text(encoding="utf-8").splitlines()
+        matches = [l for l in lines if query.lower() in l.lower()]
+        return "\n".join(matches) if matches else f"[no memories matching '{query}']"
+    except Exception as e:
+        return f"[ERROR] {type(e).__name__}: {e}"
+
+
+@tool(description="List all local tools available in this agent (names only). Use this when the user asks 'list tools', 'what can you do', or 'help'. Do NOT call mcp_list_tools for that.")
+def list_local_tools() -> str:
+    return "\n".join(sorted([
+        "read_file", "write_file", "edit_file", "create_folder",
+        "list_directory", "copy_file", "move_file", "file_info",
+        "execute_shell", "execute_python",
+        "web_search", "fetch_webpage", "http_request",
+        "mcp_list_tools", "mcp_call_tool",
+        "save_memory", "read_memory", "search_memory",
+        "skill_create", "skill_view", "skills_list", "skill_delete",
+        "cronjob_manage",
+        "get_current_time", "generate_uuid", "calculate",
+        "send_email", "check_email", "list_local_tools",
+    ]))
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -555,4 +588,6 @@ ALL_TOOLS = [
     get_current_time, generate_uuid, calculate,
     # Email
     send_email, check_email,
+    # Introspection (answer "list tools" locally, never via MCP)
+    list_local_tools,
 ]

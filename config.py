@@ -12,7 +12,7 @@ os.makedirs(MEMORY_DIR, exist_ok=True)
 MLX_SERVER_HOST = "127.0.0.1"
 MLX_SERVER_PORT = 8080
 MLX_SERVER_BASE_URL = f"http://{MLX_SERVER_HOST}:{MLX_SERVER_PORT}/v1"
-MLX_SERVER_MODEL = "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+MLX_SERVER_MODEL = "mlx-community/Qwen3-8B-4bit"
 
 # ── Whisper (Speech-to-Text) ───────────────────────────────────────────
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
