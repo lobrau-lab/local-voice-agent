@@ -23,21 +23,27 @@ from config import (
     MLX_SERVER_BASE_URL,
     MLX_SERVER_MODEL,
     MAX_TOOL_ITERATIONS,
+    NOISE_MULTIPLIER,
+    MIN_NOISE_FLOOR,
 )
 from tools import ALL_TOOLS
-
 
 # ═══════════════════════════════════════════════════════════════════════
 #  Noise calibration
 # ═══════════════════════════════════════════════════════════════════════
 
-def calibrate_noise(duration: float = 1.5) -> float:
+
+def calibrate_noise(
+    duration: float = 1.5,
+    noise_multiplier: float = NOISE_MULTIPLIER,
+    min_noise_floor: float = MIN_NOISE_FLOOR,
+) -> float:
     """Sample ambient noise and return a silence threshold.
 
-    The threshold is 3x the ambient RMS, with a floor of 0.02,
+    The threshold is `noise_multiplier` x the ambient RMS, with a floor of `min_noise_floor`,
     so it adapts to noisy or quiet environments automatically.
     """
-    print(f"\U0001F39A\uFE0F  Calibrating... stay quiet for {duration:.1f}s")
+    print(f"\U0001f39a\ufe0f  Calibrating... stay quiet for {duration:.1f}s")
     samples = sd.rec(
         int(duration * SAMPLE_RATE),
         samplerate=SAMPLE_RATE,
@@ -45,8 +51,8 @@ def calibrate_noise(duration: float = 1.5) -> float:
         dtype="float32",
     )
     sd.wait()
-    ambient = float(np.sqrt(np.mean(samples ** 2)))
-    threshold = max(ambient * 3.0, 0.02)
+    ambient = float(np.sqrt(np.mean(samples**2)))
+    threshold = max(ambient * noise_multiplier, min_noise_floor)
     print(f"   Ambient RMS: {ambient:.4f}  ->  threshold: {threshold:.4f}")
     return threshold
 
@@ -55,12 +61,15 @@ def calibrate_noise(duration: float = 1.5) -> float:
 #  Audio recording
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def record_until_silence(
     sample_rate: int = SAMPLE_RATE,
     silence_threshold: float | None = None,
     silence_duration: float = SILENCE_DURATION_SEC,
     max_duration: float = MAX_RECORD_SEC,
     min_duration: float = MIN_RECORD_SEC,
+    noise_multiplier: float = NOISE_MULTIPLIER,
+    min_noise_floor: float = MIN_NOISE_FLOOR,
 ) -> np.ndarray:
     """Record from the mic until the user stops speaking.
 
@@ -68,7 +77,9 @@ def record_until_silence(
     Returns float32 audio samples.
     """
     if silence_threshold is None:
-        silence_threshold = calibrate_noise()
+        silence_threshold = calibrate_noise(
+            noise_multiplier=noise_multiplier, min_noise_floor=min_noise_floor
+        )
 
     q: "queue.Queue[np.ndarray]" = queue.Queue()
     blocks: list[np.ndarray] = []
@@ -90,7 +101,7 @@ def record_until_silence(
     )
 
     with stream:
-        print("\U0001F3A4 Listening... (speak, then pause)")
+        print("\U0001f3a4 Listening... (speak, then pause)")
         while not stopped.is_set():
             try:
                 block = q.get(timeout=0.1)
@@ -99,7 +110,7 @@ def record_until_silence(
 
             blocks.append(block)
             elapsed = time.time() - start_time
-            rms = float(np.sqrt(np.mean(block ** 2)))
+            rms = float(np.sqrt(np.mean(block**2)))
 
             if rms < silence_threshold:
                 if silence_start is None:
@@ -127,6 +138,7 @@ def record_until_silence(
 # ═══════════════════════════════════════════════════════════════════════
 #  Speech-to-text
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def transcribe_audio(audio: np.ndarray, sample_rate: int = SAMPLE_RATE) -> str:
     """Transcribe float32 audio using mlx-whisper."""
@@ -164,6 +176,7 @@ def _get_tts_model():
     global _tts_model
     if _tts_model is None:
         from mlx_audio.tts.utils import load_model
+
         print("Loading TTS model (first time only)...")
         _tts_model = load_model(TTS_MODEL)
     return _tts_model
@@ -210,7 +223,7 @@ def speak(text: str) -> None:
     if not text.strip():
         return
 
-    print(f"\U0001F50A Speaking: {text[:120]}{'...' if len(text) > 120 else ''}")
+    print(f"\U0001f50a Speaking: {text[:120]}{'...' if len(text) > 120 else ''}")
     try:
         audio, sr = _synthesise(text)
     except Exception as e:
@@ -263,6 +276,6 @@ def build_agent():
         memory=ConversationMemory(),
         model=MLX_SERVER_MODEL,
         max_iterations=MAX_TOOL_ITERATIONS,
-        verbose=False,
+        verbose=True,
     )
     return agent
