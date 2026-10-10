@@ -365,7 +365,8 @@ def search_memory(query: str) -> str:
     if not memory_file.exists():
         return "[no memories saved yet]"
     lines = memory_file.read_text(encoding="utf-8").splitlines()
-    matches = [l for l in lines if query.lower() in l.lower()]
+    query_lower = query.lower()
+    matches = [l for l in lines if query_lower in l.lower()]
     return "\n".join(matches) if matches else f"[no memories matching '{query}']"
 
 
