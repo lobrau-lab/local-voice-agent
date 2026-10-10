@@ -20,16 +20,19 @@ WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 # ── TTS ────────────────────────────────────────────────────────────────
 # Kitten TTS or Kokoro work well with mlx-audio 0.5.x
 TTS_MODEL = "mlx-community/Kokoro-82M-4bit"
-TTS_VOICE = "af_heart"           # Kokoro voice id
-TTS_LANG_CODE = "a"              # Kokoro lang code ("a" = American English)
+TTS_VOICE = "af_heart"  # Kokoro voice id
+TTS_LANG_CODE = "a"  # Kokoro lang code ("a" = American English)
 
 # ── Audio Recording ────────────────────────────────────────────────────
 SAMPLE_RATE = 16000
 CHANNELS = 1
-SILENCE_THRESHOLD = 0.015
+SILENCE_THRESHOLD = 0.03
 SILENCE_DURATION_SEC = 1.5
 MAX_RECORD_SEC = 30.0
 MIN_RECORD_SEC = 1.0
 
 # ── Agent Behaviour ────────────────────────────────────────────────────
 MAX_TOOL_ITERATIONS = 10
+
+NOISE_MULTIPLIER = 3.0
+MIN_NOISE_FLOOR = 0.05
