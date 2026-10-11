@@ -62,6 +62,9 @@ def calibrate_noise(
 # ═══════════════════════════════════════════════════════════════════════
 
 
+_cached_silence_threshold: float | None = None
+
+
 def record_until_silence(
     sample_rate: int = SAMPLE_RATE,
     silence_threshold: float | None = None,
@@ -73,13 +76,18 @@ def record_until_silence(
 ) -> np.ndarray:
     """Record from the mic until the user stops speaking.
 
-    If silence_threshold is None, auto-calibrates from ambient noise.
+    If silence_threshold is None, auto-calibrates from ambient noise
+    and caches the result to speed up subsequent calls.
     Returns float32 audio samples.
     """
+    global _cached_silence_threshold
+
     if silence_threshold is None:
-        silence_threshold = calibrate_noise(
-            noise_multiplier=noise_multiplier, min_noise_floor=min_noise_floor
-        )
+        if _cached_silence_threshold is None:
+            _cached_silence_threshold = calibrate_noise(
+                noise_multiplier=noise_multiplier, min_noise_floor=min_noise_floor
+            )
+        silence_threshold = _cached_silence_threshold
 
     q: "queue.Queue[np.ndarray]" = queue.Queue()
     blocks: list[np.ndarray] = []
