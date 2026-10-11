@@ -26,7 +26,7 @@ from config import MLX_SERVER_BASE_URL, MLX_SERVER_MODEL
 from agent_weave import Agent, AgentSettings
 from agent_weave.llm.openai_backend import OpenAIBackend
 from agent_weave.memory import ConversationMemory
-from tools_full import ALL_TOOLS
+from tools import ALL_TOOLS
 
 console = Console()
 
