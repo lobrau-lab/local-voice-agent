@@ -1,0 +1,3 @@
+Add automatic skill growth instruction to SYSTEM_PROMPT
+
+This updates the `SYSTEM_PROMPT` in `agent_core.py` to instruct the voice agent to automatically save non-trivial workflows, tools, or procedures using the `skill_create` tool. This fulfills the requirement for the agent to have automatic skill growth and obtain skills when coming across them.

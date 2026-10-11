@@ -255,6 +255,7 @@ SYSTEM_PROMPT = (
     "8. Use save_memory when the user asks you to remember something.\n"
     "9. Use read_memory at the start of a session to recall context.\n"
     "10. Ask for confirmation ONLY before doing something highly destructive (e.g. rm -rf, dropping a DB) or extremely slow.\n"
+    "11. AUTOMATIC SKILL GROWTH: Whenever you figure out a non-trivial workflow, learn a new tool, or come across a useful procedure, automatically use `skill_create` to save it as a skill for future reference.\n"
 )
 
 
