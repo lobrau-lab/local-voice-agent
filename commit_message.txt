@@ -1,5 +1,5 @@
 No codebase changes required for MCP connection.
 
 The local voice agent already supports connecting to external MCP servers out of the box.
-`tools_full.py` includes `mcp_list_tools` and `mcp_call_tool` that can interact with any HTTP/SSE based MCP server.
+`tools.py` includes `mcp_list_tools` and `mcp_call_tool` that can interact with any HTTP/SSE based MCP server.
 I have added a memory note for the agent to remember that Ace Studio MCP typically runs at `http://127.0.0.1:21572/mcp` and it can connect to it directly via its existing MCP tools.
