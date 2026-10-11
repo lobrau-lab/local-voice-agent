@@ -551,14 +551,19 @@ def check_email(limit: int = 10) -> str:
             m.select("INBOX")
             _, data = m.search(None, "ALL")
             ids = data[0].split()[-limit:]
+            if not ids:
+                return "[no emails]"
             results = []
-            for eid in reversed(ids):
-                _, msg_data = m.fetch(eid, "(RFC822)")
-                msg = email_lib.message_from_bytes(msg_data[0][1])
-                results.append(
-                    f"From: {msg['From']}\nSubject: {msg['Subject']}\n"
-                    f"Date: {msg['Date']}\n"
-                )
+            id_list = b",".join(ids)
+            _, msg_data = m.fetch(id_list, "(RFC822)")
+            for part in msg_data:
+                if isinstance(part, tuple):
+                    msg = email_lib.message_from_bytes(part[1])
+                    results.append(
+                        f"From: {msg['From']}\nSubject: {msg['Subject']}\n"
+                        f"Date: {msg['Date']}\n"
+                    )
+            results.reverse()
             return "\n---\n".join(results) if results else "[no emails]"
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"
