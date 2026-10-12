@@ -212,7 +212,7 @@ def execute_shell(command: str, cwd: str = "") -> str:
             out = f"[exit code {result.returncode}]"
         return out[:8000]
     except subprocess.TimeoutExpired:
-        return "[ERROR] Command timed out (30s)."
+        return "[ERROR] Command timed out after 30 seconds."
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"
 
@@ -380,7 +380,8 @@ def search_memory(query: str) -> str:
         if not memory_file.exists():
             return "[no memories saved yet]"
         lines = memory_file.read_text(encoding="utf-8").splitlines()
-        matches = [l for l in lines if query.lower() in l.lower()]
+        query_lower = query.lower()
+        matches = [l for l in lines if query_lower in l.lower()]
         return "\n".join(matches) if matches else f"[no memories matching '{query}']"
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"
@@ -503,7 +504,27 @@ def calculate(expression: str) -> str:
     if not all(c in allowed for c in expression):
         return "[ERROR] Expression contains disallowed characters."
     try:
-        result = eval(expression, {"__builtins__": {}}, {})
+        # safe math eval
+        import ast
+        import operator
+
+        def safe_eval(expr):
+            ops = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
+                   ast.Div: operator.truediv, ast.Pow: operator.pow, ast.BitXor: operator.xor,
+                   ast.USub: operator.neg, ast.Mod: operator.mod}
+
+            def eval_node(node):
+                if isinstance(node, ast.Constant):
+                    return node.value
+                elif isinstance(node, ast.BinOp):
+                    return ops[type(node.op)](eval_node(node.left), eval_node(node.right))
+                elif isinstance(node, ast.UnaryOp):
+                    return ops[type(node.op)](eval_node(node.operand))
+                else:
+                    raise TypeError(node)
+            return eval_node(ast.parse(expr, mode='eval').body)
+
+        result = safe_eval(expression)
         return f"{expression} = {result}"
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"
@@ -552,13 +573,18 @@ def check_email(limit: int = 10) -> str:
             _, data = m.search(None, "ALL")
             ids = data[0].split()[-limit:]
             results = []
-            for eid in reversed(ids):
-                _, msg_data = m.fetch(eid, "(RFC822)")
-                msg = email_lib.message_from_bytes(msg_data[0][1])
-                results.append(
-                    f"From: {msg['From']}\nSubject: {msg['Subject']}\n"
-                    f"Date: {msg['Date']}\n"
-                )
+            if ids:
+                fetch_ids = b",".join(reversed(ids))
+                _, msg_data = m.fetch(fetch_ids, "(RFC822)")
+                # msg_data contains tuples of (header, message) and then a b')' for each message.
+                for response_part in msg_data:
+                    if isinstance(response_part, tuple):
+                        msg = email_lib.message_from_bytes(response_part[1])
+                        results.append(
+                            f"From: {msg['From']}\nSubject: {msg['Subject']}\n"
+                            f"Date: {msg['Date']}\n"
+                        )
+                results.reverse()
             return "\n---\n".join(results) if results else "[no emails]"
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"

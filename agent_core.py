@@ -1,6 +1,5 @@
 """Agent construction, audio I/O, speech-to-text, and text-to-speech."""
 
-import os
 import queue
 import sys
 import threading

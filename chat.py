@@ -16,7 +16,6 @@ try:
 except Exception as _e:
     print(f"[warn] Could not patch openai for thinking mode: {_e}")
 
-import sys
 import os
 import platform
 from pathlib import Path
