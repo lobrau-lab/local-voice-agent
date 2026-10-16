@@ -521,8 +521,8 @@ def calculate(expression: str) -> str:
                 elif isinstance(node, ast.UnaryOp):
                     return ops[type(node.op)](eval_node(node.operand))
                 else:
-                    raise TypeError(node)
-            return eval_node(ast.parse(expr, mode='eval').body)
+                    return () if isinstance(node, ast.Tuple) and not node.elts else (_ for _ in ()).throw(TypeError(node))
+            return eval_node(ast.parse(expr.strip(), mode='eval').body)
 
         result = safe_eval(expression)
         return f"{expression} = {result}"

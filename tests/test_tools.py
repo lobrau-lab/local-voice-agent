@@ -101,6 +101,33 @@ def test_read_file_not_found():
         result = read_file.func(str(test_file))
         assert result.startswith("[ERROR] Not a file:")
 
+
+def test_read_file_truncation():
+    """Test reading a file that exceeds the character limit."""
+    if ALLOWED_ROOTS:
+        root = ALLOWED_ROOTS[0]
+        root.mkdir(parents=True, exist_ok=True)
+        test_file = root / "test_read_file_truncation.txt"
+        test_content = "A" * 20000
+        try:
+            test_file.write_text(test_content)
+            result = read_file.func(str(test_file))
+            assert len(result) == 16000
+            assert result == "A" * 16000
+        finally:
+            if test_file.exists():
+                test_file.unlink()
+
+def test_read_file_exception():
+    """Test handling of exceptions during read_file."""
+    if ALLOWED_ROOTS:
+        root = ALLOWED_ROOTS[0]
+        test_file = root / "test_read_file_exception.txt"
+        with patch("tools.Path.is_file") as mock_is_file:
+            mock_is_file.side_effect = PermissionError("Permission denied")
+            result = read_file.func(str(test_file))
+            assert result.startswith("[ERROR] PermissionError: Permission denied")
+
 # --- execute_shell Tests ---
 
 @patch("tools.subprocess.run")
