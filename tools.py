@@ -19,6 +19,39 @@ from agent_weave import tool
 #  CONFIG
 # ═══════════════════════════════════════════════════════════════════════
 
+
+import socket
+import ipaddress
+import urllib.parse
+
+
+def _is_safe_url(url: str) -> bool:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+
+        addr_infos = socket.getaddrinfo(hostname, None)
+        for addr_info in addr_infos:
+            ip = addr_info[4][0]
+            ip_obj = ipaddress.ip_address(ip)
+            if (
+                ip_obj.is_loopback
+                or ip_obj.is_private
+                or ip_obj.is_link_local
+                or ip_obj.is_multicast
+                or ip_obj.is_unspecified
+                or ip_obj.is_reserved
+            ):
+                return False
+        return True
+    except Exception:
+        return False
+
+
 from config import MEMORY_DIR
 
 MEMORY_PATH = Path(MEMORY_DIR)
@@ -34,8 +67,14 @@ ALLOWED_ROOTS = [
 ]
 
 BLOCKED_COMMANDS = [
-    "rm -rf /", "sudo rm", "mkfs", "dd if=",
-    ":(){ :|:& };:", "> /dev/sda", "shutdown", "reboot",
+    "rm -rf /",
+    "sudo rm",
+    "mkfs",
+    "dd if=",
+    ":(){ :|:& };:",
+    "> /dev/sda",
+    "shutdown",
+    "reboot",
 ]
 
 WORKSPACE = Path.home() / ".my_voice_agent"
@@ -65,7 +104,10 @@ def _is_path_allowed(path: str) -> bool:
 #  FILE SYSTEM TOOLS
 # ═══════════════════════════════════════════════════════════════════════
 
-@tool(description="Read a text file and return its contents. Sandboxed to allowed directories.")
+
+@tool(
+    description="Read a text file and return its contents. Sandboxed to allowed directories."
+)
 def read_file(path: str) -> str:
     if not _is_path_allowed(path):
         return f"[BLOCKED] Access to '{path}' not permitted."
@@ -91,7 +133,9 @@ def write_file(path: str, content: str) -> str:
         return f"[ERROR] {type(e).__name__}: {e}"
 
 
-@tool(description="Edit a file by replacing old_text with new_text. Use for surgical edits instead of rewriting the whole file.")
+@tool(
+    description="Edit a file by replacing old_text with new_text. Use for surgical edits instead of rewriting the whole file."
+)
 def edit_file(path: str, old_text: str, new_text: str) -> str:
     if not _is_path_allowed(path):
         return f"[BLOCKED] Access to '{path}' not permitted."
@@ -146,6 +190,7 @@ def copy_file(src: str, dst: str) -> str:
         return "[BLOCKED] Source or destination not permitted."
     try:
         import shutil
+
         s = Path(src).expanduser().resolve()
         d = Path(dst).expanduser().resolve()
         d.parent.mkdir(parents=True, exist_ok=True)
@@ -161,6 +206,7 @@ def move_file(src: str, dst: str) -> str:
         return "[BLOCKED] Source or destination not permitted."
     try:
         import shutil
+
         s = Path(src).expanduser().resolve()
         d = Path(dst).expanduser().resolve()
         d.parent.mkdir(parents=True, exist_ok=True)
@@ -179,13 +225,16 @@ def file_info(path: str) -> str:
         if not p.exists():
             return f"[ERROR] Path does not exist: {path}"
         st = p.stat()
-        return json.dumps({
-            "path": str(p),
-            "type": "directory" if p.is_dir() else "file",
-            "size_bytes": st.st_size,
-            "modified": datetime.fromtimestamp(st.st_mtime).isoformat(),
-            "created": datetime.fromtimestamp(st.st_ctime).isoformat(),
-        }, indent=2)
+        return json.dumps(
+            {
+                "path": str(p),
+                "type": "directory" if p.is_dir() else "file",
+                "size_bytes": st.st_size,
+                "modified": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                "created": datetime.fromtimestamp(st.st_ctime).isoformat(),
+            },
+            indent=2,
+        )
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"
 
@@ -194,7 +243,10 @@ def file_info(path: str) -> str:
 #  SHELL / CODE EXECUTION
 # ═══════════════════════════════════════════════════════════════════════
 
-@tool(description="Run a shell command and return stdout/stderr. Destructive commands blocked.")
+
+@tool(
+    description="Run a shell command and return stdout/stderr. Destructive commands blocked."
+)
 def execute_shell(command: str, cwd: str = "") -> str:
     for blocked in BLOCKED_COMMANDS:
         if blocked in command:
@@ -202,8 +254,12 @@ def execute_shell(command: str, cwd: str = "") -> str:
     try:
         workdir = str(Path(cwd).expanduser().resolve()) if cwd else str(Path.cwd())
         result = subprocess.run(
-            command, shell=True, capture_output=True, text=True,
-            timeout=30, cwd=workdir,
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=workdir,
         )
         out = result.stdout
         if result.stderr:
@@ -217,12 +273,16 @@ def execute_shell(command: str, cwd: str = "") -> str:
         return f"[ERROR] {type(e).__name__}: {e}"
 
 
-@tool(description="Execute Python code in a subprocess and return the result. Use for calculations, data processing, and scripting.")
+@tool(
+    description="Execute Python code in a subprocess and return the result. Use for calculations, data processing, and scripting."
+)
 def execute_python(code: str) -> str:
     try:
         result = subprocess.run(
             ["python", "-c", code],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         out = result.stdout
         if result.stderr:
@@ -237,6 +297,7 @@ def execute_python(code: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════
 #  WEB / HTTP / API
 # ═══════════════════════════════════════════════════════════════════════
+
 
 @tool(description="Search the web via DuckDuckGo and return top results.")
 def web_search(query: str, max_results: int = 5) -> str:
@@ -259,9 +320,14 @@ def web_search(query: str, max_results: int = 5) -> str:
 
 @tool(description="Fetch a web page and return its visible text.")
 def fetch_webpage(url: str) -> str:
+    if not _is_safe_url(url):
+        return "[ERROR] Unsafe URL provided: internal or restricted IP ranges are not allowed."
     try:
         from bs4 import BeautifulSoup
-        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        }
         resp = requests.get(url, headers=headers, timeout=15)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -272,16 +338,29 @@ def fetch_webpage(url: str) -> str:
         return f"[ERROR] {type(e).__name__}: {e}"
 
 
-@tool(description="Make an arbitrary HTTP request to an API. Supports GET, POST, PUT, DELETE, PATCH. Returns the response body (truncated) and status code.")
-def http_request(url: str, method: str = "GET", headers_json: str = "{}",
-                 body_json: str = "", timeout: int = 30) -> str:
+@tool(
+    description="Make an arbitrary HTTP request to an API. Supports GET, POST, PUT, DELETE, PATCH. Returns the response body (truncated) and status code."
+)
+def http_request(
+    url: str,
+    method: str = "GET",
+    headers_json: str = "{}",
+    body_json: str = "",
+    timeout: int = 30,
+) -> str:
     """Make an HTTP API request. headers_json and body_json are JSON strings."""
+    if not _is_safe_url(url):
+        return "[ERROR] Unsafe URL provided: internal or restricted IP ranges are not allowed."
     try:
         headers = json.loads(headers_json) if headers_json else {}
         body = json.loads(body_json) if body_json else None
         method = method.upper()
         resp = requests.request(
-            method, url, headers=headers, json=body, timeout=timeout,
+            method,
+            url,
+            headers=headers,
+            json=body,
+            timeout=timeout,
         )
         text = resp.text[:8000]
         return f"[HTTP {resp.status_code}]\n{text}"
@@ -295,14 +374,20 @@ def http_request(url: str, method: str = "GET", headers_json: str = "{}",
 #  MCP CLIENT
 # ═══════════════════════════════════════════════════════════════════════
 
-@tool(description="Connect to an MCP server over HTTP/SSE and list its available tools. The server URL should be the MCP endpoint. Supports the Streamable HTTP transport.")
+
+@tool(
+    description="Connect to an MCP server over HTTP/SSE and list its available tools. The server URL should be the MCP endpoint. Supports the Streamable HTTP transport."
+)
 def mcp_list_tools(server_url: str) -> str:
     """List tools from an MCP server. Returns JSON of tool definitions."""
     try:
         resp = requests.post(
             server_url,
             json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
-            headers={"Content-Type": "application/json", "Accept": "application/json, text/event-stream"},
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
+            },
             timeout=15,
         )
         if resp.status_code != 200:
@@ -319,7 +404,9 @@ def mcp_list_tools(server_url: str) -> str:
         return f"[MCP ERROR] {type(e).__name__}: {e}"
 
 
-@tool(description="Call a tool on a remote MCP server. Pass arguments as a JSON string.")
+@tool(
+    description="Call a tool on a remote MCP server. Pass arguments as a JSON string."
+)
 def mcp_call_tool(server_url: str, tool_name: str, arguments_json: str = "{}") -> str:
     """Call a tool on an MCP server. arguments_json is a JSON object string."""
     try:
@@ -327,10 +414,15 @@ def mcp_call_tool(server_url: str, tool_name: str, arguments_json: str = "{}") -
         resp = requests.post(
             server_url,
             json={
-                "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
                 "params": {"name": tool_name, "arguments": args},
             },
-            headers={"Content-Type": "application/json", "Accept": "application/json, text/event-stream"},
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
+            },
             timeout=60,
         )
         if resp.status_code != 200:
@@ -350,7 +442,10 @@ def mcp_call_tool(server_url: str, tool_name: str, arguments_json: str = "{}") -
 #  MEMORY
 # ═══════════════════════════════════════════════════════════════════════
 
-@tool(description="Save a note to persistent memory. Use for facts, preferences, and context across sessions.")
+
+@tool(
+    description="Save a note to persistent memory. Use for facts, preferences, and context across sessions."
+)
 def save_memory(note: str, category: str = "general") -> str:
     try:
         memory_file = MEMORY_PATH / "MEMORY.md"
@@ -387,27 +482,55 @@ def search_memory(query: str) -> str:
         return f"[ERROR] {type(e).__name__}: {e}"
 
 
-@tool(description="List all local tools available in this agent (names only). Use this when the user asks 'list tools', 'what can you do', or 'help'. Do NOT call mcp_list_tools for that.")
+@tool(
+    description="List all local tools available in this agent (names only). Use this when the user asks 'list tools', 'what can you do', or 'help'. Do NOT call mcp_list_tools for that."
+)
 def list_local_tools() -> str:
-    return "\n".join(sorted([
-        "read_file", "write_file", "edit_file", "create_folder",
-        "list_directory", "copy_file", "move_file", "file_info",
-        "execute_shell", "execute_python",
-        "web_search", "fetch_webpage", "http_request",
-        "mcp_list_tools", "mcp_call_tool",
-        "save_memory", "read_memory", "search_memory",
-        "skill_create", "skill_view", "skills_list", "skill_delete",
-        "cronjob_manage",
-        "get_current_time", "generate_uuid", "calculate",
-        "send_email", "check_email", "list_local_tools",
-    ]))
+    return "\n".join(
+        sorted(
+            [
+                "read_file",
+                "write_file",
+                "edit_file",
+                "create_folder",
+                "list_directory",
+                "copy_file",
+                "move_file",
+                "file_info",
+                "execute_shell",
+                "execute_python",
+                "web_search",
+                "fetch_webpage",
+                "http_request",
+                "mcp_list_tools",
+                "mcp_call_tool",
+                "save_memory",
+                "read_memory",
+                "search_memory",
+                "skill_create",
+                "skill_view",
+                "skills_list",
+                "skill_delete",
+                "cronjob_manage",
+                "get_current_time",
+                "generate_uuid",
+                "calculate",
+                "send_email",
+                "check_email",
+                "list_local_tools",
+            ]
+        )
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
 #  SKILLS (self-learning, Hermes-style)
 # ═══════════════════════════════════════════════════════════════════════
 
-@tool(description="Save a reusable skill/procedure to disk. Skills are markdown documents the agent can load later. Use this when you figure out a non-trivial workflow worth remembering.")
+
+@tool(
+    description="Save a reusable skill/procedure to disk. Skills are markdown documents the agent can load later. Use this when you figure out a non-trivial workflow worth remembering."
+)
 def skill_create(name: str, content: str) -> str:
     slug = "".join(c if c.isalnum() or c in "-_" else "-" for c in name.lower())
     path = SKILLS_DIR / f"{slug}.md"
@@ -446,9 +569,13 @@ def skill_delete(name: str) -> str:
 #  SCHEDULING / CRON
 # ═══════════════════════════════════════════════════════════════════════
 
-@tool(description="Create a scheduled task. The task is a shell command that runs at the given interval. Interval accepts values like '1h', '30m', '1d', or a standard cron expression.")
-def cronjob_manage(action: str, name: str = "", command: str = "",
-                   interval: str = "") -> str:
+
+@tool(
+    description="Create a scheduled task. The task is a shell command that runs at the given interval. Interval accepts values like '1h', '30m', '1d', or a standard cron expression."
+)
+def cronjob_manage(
+    action: str, name: str = "", command: str = "", interval: str = ""
+) -> str:
     """Manage scheduled tasks. action is 'create', 'list', or 'delete'."""
     task_file = CRON_DIR / "tasks.json"
     tasks = {}
@@ -488,6 +615,7 @@ def cronjob_manage(action: str, name: str = "", command: str = "",
 #  UTILITIES
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @tool(description="Get the current local date and time.")
 def get_current_time() -> str:
     return datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
@@ -498,7 +626,9 @@ def generate_uuid() -> str:
     return str(uuid.uuid4())
 
 
-@tool(description="Evaluate a mathematical expression safely. Supports + - * / ** % and parentheses.")
+@tool(
+    description="Evaluate a mathematical expression safely. Supports + - * / ** % and parentheses."
+)
 def calculate(expression: str) -> str:
     allowed = set("0123456789+-*/().% ")
     if not all(c in allowed for c in expression):
@@ -509,22 +639,34 @@ def calculate(expression: str) -> str:
         import operator
 
         def safe_eval(expr):
-            ops = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
-                   ast.Div: operator.truediv, ast.Pow: operator.pow, ast.BitXor: operator.xor,
-                   ast.USub: operator.neg, ast.Mod: operator.mod}
+            ops = {
+                ast.Add: operator.add,
+                ast.Sub: operator.sub,
+                ast.Mult: operator.mul,
+                ast.Div: operator.truediv,
+                ast.Pow: operator.pow,
+                ast.BitXor: operator.xor,
+                ast.USub: operator.neg,
+                ast.Mod: operator.mod,
+            }
 
             def eval_node(node):
                 if isinstance(node, ast.Constant):
                     return node.value
                 elif isinstance(node, ast.BinOp):
-                    return ops[type(node.op)](eval_node(node.left), eval_node(node.right))
+                    return ops[type(node.op)](
+                        eval_node(node.left), eval_node(node.right)
+                    )
                 elif isinstance(node, ast.UnaryOp):
                     return ops[type(node.op)](eval_node(node.operand))
+                elif isinstance(node, ast.Tuple):
+                    return tuple(eval_node(n) for n in node.elts)
                 else:
                     raise TypeError(node)
-            return eval_node(ast.parse(expr, mode='eval').body)
 
-        result = safe_eval(expression)
+            return eval_node(ast.parse(expr, mode="eval").body)
+
+        result = safe_eval(expression.strip())
         return f"{expression} = {result}"
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"
@@ -534,10 +676,14 @@ def calculate(expression: str) -> str:
 #  EMAIL (SMTP send + IMAP read)
 # ═══════════════════════════════════════════════════════════════════════
 
-@tool(description="Send an email via SMTP. Requires SMTP_HOST, SMTP_USER, SMTP_PASS in environment variables.")
+
+@tool(
+    description="Send an email via SMTP. Requires SMTP_HOST, SMTP_USER, SMTP_PASS in environment variables."
+)
 def send_email(to: str, subject: str, body: str) -> str:
     import smtplib
     from email.mime.text import MIMEText
+
     host = os.environ.get("SMTP_HOST", "")
     user = os.environ.get("SMTP_USER", "")
     password = os.environ.get("SMTP_PASS", "")
@@ -557,10 +703,13 @@ def send_email(to: str, subject: str, body: str) -> str:
         return f"[ERROR] {type(e).__name__}: {e}"
 
 
-@tool(description="Read recent emails via IMAP. Requires IMAP_HOST, IMAP_USER, IMAP_PASS in environment variables.")
+@tool(
+    description="Read recent emails via IMAP. Requires IMAP_HOST, IMAP_USER, IMAP_PASS in environment variables."
+)
 def check_email(limit: int = 10) -> str:
     import imaplib
     import email as email_lib
+
     host = os.environ.get("IMAP_HOST", "")
     user = os.environ.get("IMAP_USER", "")
     password = os.environ.get("IMAP_PASS", "")
@@ -596,24 +745,42 @@ def check_email(limit: int = 10) -> str:
 
 ALL_TOOLS = [
     # File system
-    read_file, write_file, edit_file, create_folder, list_directory,
-    copy_file, move_file, file_info,
+    read_file,
+    write_file,
+    edit_file,
+    create_folder,
+    list_directory,
+    copy_file,
+    move_file,
+    file_info,
     # Shell / code
-    execute_shell, execute_python,
+    execute_shell,
+    execute_python,
     # Web / HTTP
-    web_search, fetch_webpage, http_request,
+    web_search,
+    fetch_webpage,
+    http_request,
     # MCP
-    mcp_list_tools, mcp_call_tool,
+    mcp_list_tools,
+    mcp_call_tool,
     # Memory
-    save_memory, read_memory, search_memory,
+    save_memory,
+    read_memory,
+    search_memory,
     # Skills
-    skill_create, skill_view, skills_list, skill_delete,
+    skill_create,
+    skill_view,
+    skills_list,
+    skill_delete,
     # Scheduling
     cronjob_manage,
     # Utilities
-    get_current_time, generate_uuid, calculate,
+    get_current_time,
+    generate_uuid,
+    calculate,
     # Email
-    send_email, check_email,
+    send_email,
+    check_email,
     # Introspection (answer "list tools" locally, never via MCP)
     list_local_tools,
 ]
