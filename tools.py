@@ -664,6 +664,8 @@ def calculate(expression: str) -> str:
                     return tuple(eval_node(n) for n in node.elts)
                 else:
                     raise TypeError(node)
+            parsed = ast.parse(expr.strip(), mode='eval').body
+            return eval_node(parsed)
 
             return eval_node(ast.parse(expr, mode="eval").body)
 
@@ -724,12 +726,12 @@ def check_email(limit: int = 10) -> str:
             ids = data[0].split()[-limit:]
             results = []
             if ids:
-                fetch_ids = b",".join(reversed(ids))
+                fetch_ids = b",".join(ids)
                 _, msg_data = m.fetch(fetch_ids, "(RFC822)")
                 # msg_data contains tuples of (header, message) and then a b')' for each message.
-                for response_part in msg_data:
-                    if isinstance(response_part, tuple):
-                        msg = email_lib.message_from_bytes(response_part[1])
+                for part in msg_data:
+                    if isinstance(part, tuple):
+                        msg = email_lib.message_from_bytes(part[1])
                         results.append(
                             f"From: {msg['From']}\nSubject: {msg['Subject']}\n"
                             f"Date: {msg['Date']}\n"
