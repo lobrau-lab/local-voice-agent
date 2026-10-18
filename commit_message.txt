@@ -1,1 +1,1 @@
-Fix issues
+🧪 Add tests for agent_core.py with mocked hardware and ML models

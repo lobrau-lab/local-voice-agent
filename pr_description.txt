@@ -1,3 +1,15 @@
+🎯 **What:**
+Added extensive testing for `agent_core.py`, which is responsible for audio I/O, speech-to-text, text-to-speech, and agent initialization. This addresses a significant gap in the test suite where the core logic was entirely untested.
+
+📊 **Coverage:**
+* `calibrate_noise`: Tested calculation of silence thresholds and handling of minimum noise floors.
+* `record_until_silence`: Validated audio recording limits (min/max durations) and tested accurate stop triggers based on simulated silence.
+* `transcribe_audio`: Simulated `mlx_whisper` and verified the internal audio resampling functionality.
+* `_synthesise` / `speak`: Mocked the `mlx_audio` model generator and validated logic execution, along with checks that prevent empty text from triggering audio play.
+* `build_agent`: Tested agent instantiation configuration against mocked `agent_weave` interfaces.
+
+✨ **Result:**
+By extensively mocking hardware requirements (like the microphone and speaker) and the large local AI models, `agent_core.py` is now covered by fast, deterministic tests without relying on a complex external environment. Test coverage and reliability are vastly improved.
 🎯 **What:** The `execute_shell` function in `tools.py` contained a command injection vulnerability due to the use of `subprocess.run` with `shell=True`.
 ⚠️ **Risk:** An attacker could exploit this by providing a command with shell metacharacters (e.g., `|`, `;`, `&&`, `$()`) to execute arbitrary shell commands. The existing check using `BLOCKED_COMMANDS` was insufficient because it only matched explicit strings and could easily be bypassed. This could lead to a complete system compromise depending on the user running the agent.
 🛡️ **Solution:** Modified the `subprocess.run` call in `execute_shell` to use `shell=False`. The command string is now parsed into a list of arguments using `shlex.split(command)` before being passed to `subprocess.run`. This ensures the arguments are passed directly to the executable, avoiding the shell interpreter entirely and preventing command injection.
