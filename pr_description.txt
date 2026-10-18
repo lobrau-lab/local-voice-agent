@@ -1,10 +1,3 @@
-⚡ Cache noise calibration
-
-💡 **What:** Caches the result of `calibrate_noise()` using a module-level variable `_cached_silence_threshold` within `agent_core.py`. If `record_until_silence()` is called without an explicit `silence_threshold`, it computes it once and reuses the cached value on subsequent calls.
-
-🎯 **Why:** `calibrate_noise()` defaults to a 1.5-second ambient sampling duration. Because this function is called inside the `voice_loop()` on *every* recording iteration, this added a continuous 1.5 seconds of overhead (latency) before the mic even began listening. By caching the threshold, the latency for all subsequent iterations drops effectively to zero.
-
-📊 **Measured Improvement:**
-Baseline (before optimization): 3 iterations took ~7.677s (avg 2.5s per recording + mock logic delay).
-After optimization: 3 iterations took ~4.675s (iteration 1 took 2.559s, iterations 2 & 3 took 1.058s).
-The time savings is exactly 1.5s per loop iteration (a 100% savings on the calibration cost).
+🎯 **What:** The `execute_shell` function in `tools.py` contained a command injection vulnerability due to the use of `subprocess.run` with `shell=True`.
+⚠️ **Risk:** An attacker could exploit this by providing a command with shell metacharacters (e.g., `|`, `;`, `&&`, `$()`) to execute arbitrary shell commands. The existing check using `BLOCKED_COMMANDS` was insufficient because it only matched explicit strings and could easily be bypassed. This could lead to a complete system compromise depending on the user running the agent.
+🛡️ **Solution:** Modified the `subprocess.run` call in `execute_shell` to use `shell=False`. The command string is now parsed into a list of arguments using `shlex.split(command)` before being passed to `subprocess.run`. This ensures the arguments are passed directly to the executable, avoiding the shell interpreter entirely and preventing command injection.
