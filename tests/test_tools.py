@@ -10,64 +10,64 @@ from tools import read_file, _is_path_allowed, execute_shell, ALLOWED_ROOTS
 # --- _is_path_allowed Tests ---
 
 
+import tools
+
+
 def test_is_path_allowed_valid():
-    """Test _is_path_allowed with a path inside ALLOWED_ROOTS."""
-    if ALLOWED_ROOTS:
-        root = ALLOWED_ROOTS[0]
-        root.mkdir(parents=True, exist_ok=True)
-        root = ALLOWED_ROOTS[0]
-        valid_path = root / "some_file.txt"
-        assert _is_path_allowed(str(valid_path)) is True
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        original_roots = tools.ALLOWED_ROOTS[:]
+        tools.ALLOWED_ROOTS = [temp_path]
+        try:
+            valid_path = temp_path / "some_file.txt"
+            assert _is_path_allowed(str(valid_path)) is True
+        finally:
+            tools.ALLOWED_ROOTS = original_roots
 
 
 def test_is_path_allowed_invalid():
-    """Test _is_path_allowed with a path outside ALLOWED_ROOTS."""
-    invalid_path = Path("/tmp/outside_allowed_roots.txt")
-    if ALLOWED_ROOTS and not any(r in invalid_path.parents for r in ALLOWED_ROOTS):
-        assert _is_path_allowed(str(invalid_path)) is False
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        original_roots = tools.ALLOWED_ROOTS[:]
+        tools.ALLOWED_ROOTS = [temp_path]
+        try:
+            with tempfile.TemporaryDirectory() as other_dir:
+                invalid_path = Path(other_dir) / "outside.txt"
+                assert _is_path_allowed(str(invalid_path)) is False
+        finally:
+            tools.ALLOWED_ROOTS = original_roots
 
 
 def test_is_path_allowed_relative():
-    """Test _is_path_allowed with a relative path resolving inside."""
-    if ALLOWED_ROOTS:
-        root = ALLOWED_ROOTS[0]
-        root.mkdir(parents=True, exist_ok=True)
-        root = ALLOWED_ROOTS[0]
-        rel_path = f"{root}/sub_dir/../some_file.txt"
-        assert _is_path_allowed(rel_path) is True
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        original_roots = tools.ALLOWED_ROOTS[:]
+        tools.ALLOWED_ROOTS = [temp_path]
+        try:
+            (temp_path / "sub_dir").mkdir()
+            rel_path = f"{temp_path}/sub_dir/../some_file.txt"
+            assert _is_path_allowed(rel_path) is True
+        finally:
+            tools.ALLOWED_ROOTS = original_roots
 
 
 def test_is_path_allowed_symlink():
-    """Test _is_path_allowed with a symlink that points outside."""
-    if ALLOWED_ROOTS:
-        root = ALLOWED_ROOTS[0]
-        root.mkdir(parents=True, exist_ok=True)
-        root = ALLOWED_ROOTS[0]
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-
-            # create a file outside
-            target = temp_path / "target.txt"
-            target.touch()
-
-            # create a symlink inside allowed roots
-            symlink_path = root / "bad_link.txt"
-
-            try:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        original_roots = tools.ALLOWED_ROOTS[:]
+        tools.ALLOWED_ROOTS = [temp_path]
+        try:
+            with tempfile.TemporaryDirectory() as other_dir:
+                target = Path(other_dir) / "target.txt"
+                target.touch()
+                symlink_path = temp_path / "bad_link.txt"
                 os.symlink(target, symlink_path)
-                # Resolved symlink is outside ALLOWED_ROOTS (if temp_dir is not in ALLOWED_ROOTS)
-                if not any(r in target.parents for r in ALLOWED_ROOTS):
-                    assert _is_path_allowed(str(symlink_path)) is False
-            except Exception:
-                pass
-            finally:
-                if symlink_path.exists(follow_symlinks=False):
-                    symlink_path.unlink()
+                assert _is_path_allowed(str(symlink_path)) is False
+        finally:
+            tools.ALLOWED_ROOTS = original_roots
 
 
 # --- read_file Tests ---
-# Note: read_file is decorated with @tool in tools.py, which means we must test `.func` if using agent_weave tool.
-# We'll just test the function logic.
 
 
 def test_read_file_success():
@@ -203,3 +203,32 @@ def test_is_safe_url():
     assert _is_safe_url("http://169.254.169.254") is False
     assert _is_safe_url("http://0.0.0.0") is False
     assert _is_safe_url("file:///etc/passwd") is False
+
+
+def test_is_path_allowed_resolve_exception():
+    """Test _is_path_allowed catching exception on target path resolve."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        link = Path(temp_dir) / "loop"
+        os.symlink(link, link)
+        assert _is_path_allowed(str(link)) is False
+
+
+def test_is_path_allowed_root_resolve_exception():
+    """Test _is_path_allowed catching exception on root path resolve."""
+    import tools
+
+    original_roots = tools.ALLOWED_ROOTS[:]
+    with tempfile.TemporaryDirectory() as temp_dir:
+        link = Path(temp_dir) / "loop"
+        os.symlink(link, link)
+
+        # Add a bad root that will raise an exception during resolve
+        tools.ALLOWED_ROOTS = original_roots + [link]
+        try:
+            # Check with a path that resolves fine but isn't allowed
+            assert _is_path_allowed("/tmp/some/other/path") is False
+
+            # Check with a path that is allowed
+            pass
+        finally:
+            tools.ALLOWED_ROOTS = original_roots
