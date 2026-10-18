@@ -7,6 +7,7 @@ scheduling, skills, email, and utility tools.
 import json
 import os
 import subprocess
+import shlex
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -254,8 +255,8 @@ def execute_shell(command: str, cwd: str = "") -> str:
     try:
         workdir = str(Path(cwd).expanduser().resolve()) if cwd else str(Path.cwd())
         result = subprocess.run(
-            command,
-            shell=True,
+            shlex.split(command),
+            shell=False,
             capture_output=True,
             text=True,
             timeout=30,
