@@ -1,1 +1,1 @@
-🔒 Fix Command Injection in tools.py execute_shell
+🔒 Fix DoS vulnerability in calculate tool by replacing ast.parse with simpleeval

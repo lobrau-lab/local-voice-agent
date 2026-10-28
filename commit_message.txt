@@ -1,1 +1,5 @@
-🧪 Add tests for agent_core.py with mocked hardware and ML models
+🔒 Fix DoS vulnerability in calculate tool by replacing ast.parse with simpleeval
+
+The `calculate` function previously evaluated mathematical expressions using a custom logic involving `ast.parse` and recursive node evaluation. This custom implementation was susceptible to Denial-of-Service (DoS) via resource exhaustion, specifically excessive recursion or CPU exhaustion with huge powers (e.g. `9**9**9` or deeply nested parentheses).
+
+Replaced the custom AST-based `safe_eval` with the `simpleeval` library, which provides a highly secure mechanism for evaluating Python expressions. `simpleeval` limits strings, max powers, and operations inherently, thus resolving the DoS vector.

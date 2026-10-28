@@ -635,39 +635,9 @@ def calculate(expression: str) -> str:
     if not all(c in allowed for c in expression):
         return "[ERROR] Expression contains disallowed characters."
     try:
-        # safe math eval
-        import ast
-        import operator
+        import simpleeval
 
-        def safe_eval(expr):
-            ops = {
-                ast.Add: operator.add,
-                ast.Sub: operator.sub,
-                ast.Mult: operator.mul,
-                ast.Div: operator.truediv,
-                ast.Pow: operator.pow,
-                ast.BitXor: operator.xor,
-                ast.USub: operator.neg,
-                ast.Mod: operator.mod,
-            }
-
-            def eval_node(node):
-                if isinstance(node, ast.Constant):
-                    return node.value
-                elif isinstance(node, ast.BinOp):
-                    return ops[type(node.op)](
-                        eval_node(node.left), eval_node(node.right)
-                    )
-                elif isinstance(node, ast.UnaryOp):
-                    return ops[type(node.op)](eval_node(node.operand))
-                elif isinstance(node, ast.Tuple):
-                    return tuple(eval_node(n) for n in node.elts)
-                else:
-                    raise TypeError(node)
-
-            return eval_node(ast.parse(expr, mode="eval").body)
-
-        result = safe_eval(expression.strip())
+        result = simpleeval.simple_eval(expression.strip())
         return f"{expression} = {result}"
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"
