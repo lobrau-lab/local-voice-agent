@@ -11,5 +11,5 @@ def test_execute_shell_and():
     assert "hello\nworld" in result or "hello" in result
 
 def test_execute_shell_env():
-    result = execute_shell.func("FOO=bar echo $FOO")
+    result = execute_shell.func("export FOO=bar; echo $FOO")
     assert "bar" in result
