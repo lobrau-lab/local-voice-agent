@@ -5,6 +5,7 @@ scheduling, skills, email, and utility tools.
 """
 
 import json
+import heapq
 import os
 import subprocess
 import shlex
@@ -174,12 +175,13 @@ def list_directory(path: str = ".") -> str:
         p = Path(path).expanduser().resolve()
         if not p.is_dir():
             return f"[ERROR] Not a directory: {path}"
-        entries = sorted(p.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
         lines = []
-        for entry in entries[:200]:
-            icon = "DIR " if entry.is_dir() else "FILE"
-            size = f"  ({entry.stat().st_size:,} bytes)" if entry.is_file() else ""
-            lines.append(f"{icon} {entry.name}{size}")
+        with os.scandir(p) as it:
+            entries = heapq.nsmallest(200, it, key=lambda e: (not e.is_dir(), e.name.lower()))
+            for entry in entries:
+                icon = "DIR " if entry.is_dir() else "FILE"
+                size = f"  ({entry.stat().st_size:,} bytes)" if entry.is_file() else ""
+                lines.append(f"{icon} {entry.name}{size}")
         return "\n".join(lines) if lines else "[empty]"
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"

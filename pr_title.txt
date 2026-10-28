@@ -1,1 +1,1 @@
-🔒 Fix Command Injection in tools.py execute_shell
+⚡ Optimize list_directory for large directories using os.scandir and heapq

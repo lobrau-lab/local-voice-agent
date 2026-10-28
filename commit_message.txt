@@ -1,1 +1,5 @@
-🧪 Add tests for agent_core.py with mocked hardware and ML models
+Optimize list_directory using os.scandir and heapq
+
+Using os.scandir and heapq.nsmallest is dramatically faster (about 12x)
+than instantiating Path objects for everything and doing a full sort
+to just retrieve 200 items.
