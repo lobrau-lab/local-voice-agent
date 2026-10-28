@@ -86,16 +86,28 @@ CRON_DIR = WORKSPACE / "cron"
 CRON_DIR.mkdir(exist_ok=True)
 
 
+_cached_allowed_roots_tuple = None
+_cached_resolved_roots = []
+
+
 def _is_path_allowed(path: str) -> bool:
+    global _cached_allowed_roots_tuple, _cached_resolved_roots
     try:
         resolved = Path(path).expanduser().resolve()
     except (OSError, RuntimeError):
         return False
-    for root in ALLOWED_ROOTS:
-        try:
-            r = root.resolve()
-        except (OSError, RuntimeError):
-            continue
+
+    current_tuple = tuple(ALLOWED_ROOTS)
+    if _cached_allowed_roots_tuple != current_tuple:
+        _cached_resolved_roots = []
+        for root in ALLOWED_ROOTS:
+            try:
+                _cached_resolved_roots.append(root.resolve())
+            except (OSError, RuntimeError):
+                continue
+        _cached_allowed_roots_tuple = current_tuple
+
+    for r in _cached_resolved_roots:
         if resolved == r or r in resolved.parents:
             return True
     return False
