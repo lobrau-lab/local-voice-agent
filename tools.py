@@ -3,6 +3,7 @@
 Includes file ops, shell, web, HTTP API, MCP client, memory,
 scheduling, skills, email, and utility tools.
 """
+import aiofiles
 
 import json
 import os
@@ -447,12 +448,12 @@ def mcp_call_tool(server_url: str, tool_name: str, arguments_json: str = "{}") -
 @tool(
     description="Save a note to persistent memory. Use for facts, preferences, and context across sessions."
 )
-def save_memory(note: str, category: str = "general") -> str:
+async def save_memory(note: str, category: str = "general") -> str:
     try:
         memory_file = MEMORY_PATH / "MEMORY.md"
         ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-        with open(memory_file, "a", encoding="utf-8") as f:
-            f.write(f"\n- [{ts}] ({category}) {note}\n")
+        async with aiofiles.open(memory_file, "a", encoding="utf-8") as f:
+            await f.write(f"\n- [{ts}] ({category}) {note}\n")
         return f"[OK] Saved to memory ({category}): {note}"
     except Exception as e:
         return f"[ERROR] {type(e).__name__}: {e}"
