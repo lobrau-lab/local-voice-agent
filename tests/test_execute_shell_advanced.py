@@ -3,8 +3,9 @@ from tools import execute_shell
 
 def test_execute_shell_pipeline():
     result = execute_shell.func("echo 'hello | world' | wc -c")
-    # 'hello | world\n' is 14 characters
-    assert "14" in result
+    # without shell=True, the pipe is treated as a literal argument
+    # 'hello | world | wc -c\n' is the output
+    assert "hello | world | wc -c" in result
 
 def test_execute_shell_and():
     result = execute_shell.func("echo hello && echo world")
@@ -12,4 +13,4 @@ def test_execute_shell_and():
 
 def test_execute_shell_env():
     result = execute_shell.func("FOO=bar echo $FOO")
-    assert "bar" in result
+    assert "No such file or directory" in result

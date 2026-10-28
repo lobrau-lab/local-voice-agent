@@ -1,1 +1,4 @@
-🧪 Add tests for agent_core.py with mocked hardware and ML models
+✅ Fix tests due to command injection fix
+
+💡 **What:** Modified assertions in `test_execute_shell_advanced.py` to match the new behavior of `execute_shell` (which no longer uses `shell=True`).
+🎯 **Why:** The command injection fix altered how commands are parsed, causing previous tests (e.g. `echo 'hello | world' | wc -c`) to fail because shell operations like pipes `|` and environment variable assignment `FOO=bar` are passed as literal arguments rather than evaluated.
