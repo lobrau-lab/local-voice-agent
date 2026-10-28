@@ -1,1 +1,1 @@
-🔒 Fix Command Injection in tools.py execute_shell
+⚡ Optimize `_is_safe_url` with DNS Caching

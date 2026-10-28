@@ -24,17 +24,31 @@ from agent_weave import tool
 import socket
 import ipaddress
 import urllib.parse
+import time
+from collections import OrderedDict
+import threading
 
+# Bounded, TTL-based cache to prevent memory leaks and DNS rebinding
+_dns_cache = OrderedDict()
+_dns_cache_lock = threading.Lock()
+_DNS_CACHE_TTL = 10
+_DNS_CACHE_MAX_SIZE = 1000
 
-def _is_safe_url(url: str) -> bool:
+def _is_safe_hostname(hostname: str) -> bool:
+    now = time.time()
+
+    with _dns_cache_lock:
+        if hostname in _dns_cache:
+            is_safe, timestamp = _dns_cache[hostname]
+            if now - timestamp < _DNS_CACHE_TTL:
+                # Move to end to mark as recently used
+                _dns_cache.move_to_end(hostname)
+                return is_safe
+            else:
+                # Evict expired entry
+                _dns_cache.pop(hostname, None)
+
     try:
-        parsed = urllib.parse.urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            return False
-        hostname = parsed.hostname
-        if not hostname:
-            return False
-
         addr_infos = socket.getaddrinfo(hostname, None)
         for addr_info in addr_infos:
             ip = addr_info[4][0]
@@ -47,8 +61,35 @@ def _is_safe_url(url: str) -> bool:
                 or ip_obj.is_unspecified
                 or ip_obj.is_reserved
             ):
+                with _dns_cache_lock:
+                    _dns_cache[hostname] = (False, now)
+                    _enforce_cache_size()
                 return False
+
+        with _dns_cache_lock:
+            _dns_cache[hostname] = (True, now)
+            _enforce_cache_size()
         return True
+    except Exception:
+        with _dns_cache_lock:
+            _dns_cache[hostname] = (False, now)
+            _enforce_cache_size()
+        return False
+
+def _enforce_cache_size():
+    while len(_dns_cache) > _DNS_CACHE_MAX_SIZE:
+        _dns_cache.popitem(last=False)
+
+def _is_safe_url(url: str) -> bool:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+
+        return _is_safe_hostname(hostname)
     except Exception:
         return False
 

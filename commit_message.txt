@@ -1,1 +1,3 @@
-🧪 Add tests for agent_core.py with mocked hardware and ML models
+Perf: Optimize `_is_safe_url` with Bounded TTL Cache
+
+Introduces an in-memory, thread-safe cache (`_dns_cache` via `OrderedDict`) to prevent blocking thread execution during redundant DNS resolutions in `tools.py`'s `_is_safe_url`. Features a max size to prevent memory leaks and a short TTL (10s) to mitigate DNS rebinding attacks.
