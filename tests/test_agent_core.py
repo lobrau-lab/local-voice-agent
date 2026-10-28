@@ -72,9 +72,10 @@ def test_record_until_silence_stops_on_silence(mock_input_stream):
     t = threading.Thread(target=simulate_audio)
     t.start()
 
-    audio = agent_core.record_until_silence(
+    config = agent_core.RecordConfig(
         silence_threshold=0.1, silence_duration=0.5, min_duration=0.1, max_duration=5.0
     )
+    audio = agent_core.record_until_silence(config)
     t.join()
 
     assert len(audio) > 0
@@ -107,9 +108,10 @@ def test_record_until_silence_max_duration(mock_input_stream):
     t = threading.Thread(target=simulate_audio)
     t.start()
 
-    audio = agent_core.record_until_silence(
+    config = agent_core.RecordConfig(
         silence_threshold=0.1, silence_duration=1.0, min_duration=0.1, max_duration=0.5
     )
+    audio = agent_core.record_until_silence(config)
     t.join()
 
     assert len(audio) > 0

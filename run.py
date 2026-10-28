@@ -96,7 +96,7 @@ def voice_loop(
             )
         )
 
-    from agent_core import record_until_silence, transcribe_audio, speak
+    from agent_core import record_until_silence, transcribe_audio, speak, RecordConfig
 
     while True:
         try:
@@ -105,9 +105,8 @@ def voice_loop(
                 if not text:
                     continue
             else:
-                audio = record_until_silence(
-                    noise_multiplier=noise_multiplier, min_noise_floor=min_noise_floor
-                )
+                config = RecordConfig(noise_multiplier=noise_multiplier, min_noise_floor=min_noise_floor)
+                audio = record_until_silence(config)
                 if len(audio) == 0:
                     continue
 

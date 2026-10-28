@@ -1,1 +1,1 @@
-🔒 Fix Command Injection in tools.py execute_shell
+🧹 Extract RecordConfig dataclass to reduce record_until_silence parameters

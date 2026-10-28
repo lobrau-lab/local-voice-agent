@@ -1,6 +1,7 @@
 """Agent construction, audio I/O, speech-to-text, and text-to-speech."""
 
 import queue
+from dataclasses import dataclass
 import sys
 import threading
 import time
@@ -64,15 +65,19 @@ def calibrate_noise(
 _cached_silence_threshold: float | None = None
 
 
-def record_until_silence(
-    sample_rate: int = SAMPLE_RATE,
-    silence_threshold: float | None = None,
-    silence_duration: float = SILENCE_DURATION_SEC,
-    max_duration: float = MAX_RECORD_SEC,
-    min_duration: float = MIN_RECORD_SEC,
-    noise_multiplier: float = NOISE_MULTIPLIER,
-    min_noise_floor: float = MIN_NOISE_FLOOR,
-) -> np.ndarray:
+
+@dataclass
+class RecordConfig:
+    sample_rate: int = SAMPLE_RATE
+    silence_threshold: float | None = None
+    silence_duration: float = SILENCE_DURATION_SEC
+    max_duration: float = MAX_RECORD_SEC
+    min_duration: float = MIN_RECORD_SEC
+    noise_multiplier: float = NOISE_MULTIPLIER
+    min_noise_floor: float = MIN_NOISE_FLOOR
+
+
+def record_until_silence(config: RecordConfig | None = None) -> np.ndarray:
     """Record from the mic until the user stops speaking.
 
     If silence_threshold is None, auto-calibrates from ambient noise
@@ -81,12 +86,15 @@ def record_until_silence(
     """
     global _cached_silence_threshold
 
-    if silence_threshold is None:
+    if config is None:
+        config = RecordConfig()
+
+    if config.silence_threshold is None:
         if _cached_silence_threshold is None:
             _cached_silence_threshold = calibrate_noise(
-                noise_multiplier=noise_multiplier, min_noise_floor=min_noise_floor
+                noise_multiplier=config.noise_multiplier, min_noise_floor=config.min_noise_floor
             )
-        silence_threshold = _cached_silence_threshold
+        config.silence_threshold = _cached_silence_threshold
 
     q: "queue.Queue[np.ndarray]" = queue.Queue()
     blocks: list[np.ndarray] = []
@@ -100,11 +108,11 @@ def record_until_silence(
         q.put(indata.copy())
 
     stream = sd.InputStream(
-        samplerate=sample_rate,
+        samplerate=config.sample_rate,
         channels=CHANNELS,
         dtype="float32",
         callback=callback,
-        blocksize=int(sample_rate * 0.05),
+        blocksize=int(config.sample_rate * 0.05),
     )
 
     with stream:
@@ -119,26 +127,26 @@ def record_until_silence(
             elapsed = time.time() - start_time
             rms = float(np.sqrt(np.mean(block**2)))
 
-            if rms < silence_threshold:
+            if rms < config.silence_threshold:
                 if silence_start is None:
                     silence_start = time.time()
-                elif time.time() - silence_start >= silence_duration:
-                    if elapsed >= min_duration:
+                elif time.time() - silence_start >= config.silence_duration:
+                    if elapsed >= config.min_duration:
                         stopped.set()
                     else:
                         silence_start = None
             else:
                 silence_start = None
 
-            if elapsed >= max_duration:
-                print(f"Max recording length ({max_duration}s) reached.")
+            if elapsed >= config.max_duration:
+                print(f"Max recording length ({config.max_duration}s) reached.")
                 stopped.set()
 
     if not blocks:
         return np.array([], dtype=np.float32)
 
     audio = np.concatenate(blocks, axis=0).flatten()
-    print(f"Recorded {len(audio) / sample_rate:.1f}s of audio.")
+    print(f"Recorded {len(audio) / config.sample_rate:.1f}s of audio.")
     return audio
 
 
