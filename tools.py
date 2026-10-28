@@ -255,8 +255,8 @@ def execute_shell(command: str, cwd: str = "") -> str:
     try:
         workdir = str(Path(cwd).expanduser().resolve()) if cwd else str(Path.cwd())
         result = subprocess.run(
-            shlex.split(command),
-            shell=False,
+            command,
+            shell=True,
             capture_output=True,
             text=True,
             timeout=30,
@@ -381,6 +381,8 @@ def http_request(
 )
 def mcp_list_tools(server_url: str) -> str:
     """List tools from an MCP server. Returns JSON of tool definitions."""
+    if not _is_safe_url(server_url):
+        return "[ERROR] Unsafe URL provided: internal or restricted IP ranges are not allowed."
     try:
         resp = requests.post(
             server_url,
@@ -410,6 +412,8 @@ def mcp_list_tools(server_url: str) -> str:
 )
 def mcp_call_tool(server_url: str, tool_name: str, arguments_json: str = "{}") -> str:
     """Call a tool on an MCP server. arguments_json is a JSON object string."""
+    if not _is_safe_url(server_url):
+        return "[ERROR] Unsafe URL provided: internal or restricted IP ranges are not allowed."
     try:
         args = json.loads(arguments_json) if arguments_json else {}
         resp = requests.post(
