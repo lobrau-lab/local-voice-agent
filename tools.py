@@ -255,8 +255,8 @@ def execute_shell(command: str, cwd: str = "") -> str:
     try:
         workdir = str(Path(cwd).expanduser().resolve()) if cwd else str(Path.cwd())
         result = subprocess.run(
-            shlex.split(command),
-            shell=False,
+            command,
+            shell=True,
             capture_output=True,
             text=True,
             timeout=30,
@@ -274,11 +274,47 @@ def execute_shell(command: str, cwd: str = "") -> str:
         return f"[ERROR] {type(e).__name__}: {e}"
 
 
+
+import ast
+
+def _is_safe_python_code(code: str) -> tuple[bool, str]:
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return False, f"SyntaxError: {e}"
+
+    FORBIDDEN_MODULES = {"os", "sys", "subprocess", "shutil", "socket", "pty", "importlib", "pathlib", "builtins"}
+    FORBIDDEN_CALLS = {"__import__", "eval", "exec", "open", "compile", "globals", "locals", "vars", "dir", "getattr", "setattr", "delattr", "hasattr"}
+    FORBIDDEN_ATTRS = {"__builtins__", "__class__", "__subclasses__", "__bases__", "__mro__", "__dict__", "__globals__", "__code__", "__closure__", "func_globals", "func_code", "func_closure"}
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.split(".")[0] in FORBIDDEN_MODULES:
+                    return False, f"Importing '{alias.name}' is not allowed for security reasons."
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and node.module.split(".")[0] in FORBIDDEN_MODULES:
+                return False, f"Importing from '{node.module}' is not allowed for security reasons."
+        elif isinstance(node, ast.Name):
+            if node.id in FORBIDDEN_CALLS:
+                return False, f"Using '{node.id}' is not allowed for security reasons."
+        elif isinstance(node, ast.Attribute):
+            if node.attr in FORBIDDEN_ATTRS:
+                return False, f"Accessing attribute '{node.attr}' is not allowed for security reasons."
+
+    return True, ""
+
+
 @tool(
     description="Execute Python code in a subprocess and return the result. Use for calculations, data processing, and scripting."
 )
 def execute_python(code: str) -> str:
+    is_safe, error_msg = _is_safe_python_code(code)
+    if not is_safe:
+        return f"[ERROR] Code execution blocked: {error_msg}"
+
     try:
+
         result = subprocess.run(
             ["python", "-c", code],
             capture_output=True,

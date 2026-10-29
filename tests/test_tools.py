@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from tools import read_file, _is_path_allowed, execute_shell, ALLOWED_ROOTS
+from tools import read_file, _is_path_allowed, execute_shell, ALLOWED_ROOTS, execute_python
 
 # --- _is_path_allowed Tests ---
 
@@ -232,3 +232,30 @@ def test_is_path_allowed_root_resolve_exception():
             pass
         finally:
             tools.ALLOWED_ROOTS = original_roots
+
+def test_execute_python_benign():
+    code = "import math\nprint(math.sqrt(16))"
+    result = execute_python.func(code)
+    assert result.strip() == "4.0"
+
+def test_execute_python_blocked_import():
+    code = "import os\nos.system('echo malicious')"
+    result = execute_python.func(code)
+    assert "[ERROR] Code execution blocked:" in result
+    assert "not allowed for security reasons" in result
+
+def test_execute_python_blocked_eval():
+    code = "eval('1 + 1')"
+    result = execute_python.func(code)
+    assert "[ERROR] Code execution blocked:" in result
+    assert "Using 'eval' is not allowed" in result
+
+def test_execute_python_blocked_getattr():
+    code = "getattr(__builtins__, '__import__')('os')"
+    result = execute_python.func(code)
+    assert "[ERROR] Code execution blocked:" in result
+
+def test_execute_python_blocked_dunder_class():
+    code = "().__class__.__bases__[0].__subclasses__()"
+    result = execute_python.func(code)
+    assert "[ERROR] Code execution blocked:" in result

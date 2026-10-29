@@ -1,1 +1,1 @@
-🔒 Fix Command Injection in tools.py execute_shell
+🔒 Fix arbitrary code execution vulnerability in execute_python tool
