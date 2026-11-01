@@ -266,9 +266,16 @@ def execute_shell(command: str, cwd: str = "") -> str:
             return f"[BLOCKED] Prohibited pattern: '{blocked}'"
     try:
         workdir = str(Path(cwd).expanduser().resolve()) if cwd else str(Path.cwd())
+        try:
+            args = shlex.split(command)
+        except ValueError as ve:
+            return f"[ERROR] Invalid command syntax: {ve}"
+        if not args:
+            return "[ERROR] Empty command"
+
         result = subprocess.run(
-            command,
-            shell=True,
+            args,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=30,
